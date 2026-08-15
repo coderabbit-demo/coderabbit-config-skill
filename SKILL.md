@@ -1,6 +1,7 @@
 ---
 name: coderabbit-config
 description: Interactively generate a .coderabbit.yaml for this repository. Walks the user through a guided interview (quickstart or thorough), analyzes the repo for coding-guideline docs and noisy file types, and writes a schema-valid config. Use when a user asks to set up, create, tune, or review their CodeRabbit configuration.
+# Optional keys below are read by some harnesses and ignored by the rest.
 argument-hint: "[quickstart|thorough]"
 user-invocable: true
 ---
@@ -17,8 +18,9 @@ Every key you emit must be justified by an answer the user gave or by evidence y
 1. **Schema is authoritative.** Read `references/schema-reference.md` before emitting YAML. Root-level
    `additionalProperties` is `false` — a misplaced key fails the whole config. Most review settings live
    under `reviews:`, most context settings under `knowledge_base:`.
-2. **One question at a time.** Use `AskUserQuestion` when available (all questions below fit its 4-option
-   limit). Otherwise present a numbered list and wait. Never batch the whole interview into one message.
+2. **One question at a time.** If your harness has a structured multiple-choice prompt, use it — every
+   question below fits within four options. Otherwise present a numbered list and wait for a reply.
+   Never batch the whole interview into one message.
 3. **Analyze before asking.** Questions 2, 4, and 5 depend on repo analysis. Do that work *first* so you
    can show the user concrete findings instead of an open-ended prompt.
 4. **Omit defaults.** If an answer matches the schema default, don't write the key. A short config is a
@@ -29,7 +31,8 @@ Every key you emit must be justified by an answer the user gave or by evidence y
 
 ## Step 0 — Pick a mode
 
-If `$ARGUMENTS` is `quickstart` or `thorough`, use it. Otherwise ask:
+If the user supplied a mode — as an invocation argument (`$ARGUMENTS`, where your harness substitutes
+it) or anywhere in their message — use it. Otherwise ask:
 
 > **How much setup do you want to do right now?**
 > - **Quickstart** — one question, ~1 minute. Produces a solid, opinionated config you can grow into.

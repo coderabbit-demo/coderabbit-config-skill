@@ -1,39 +1,60 @@
 # CodeRabbit Config Builder
 
-A [Claude Code](https://claude.com/claude-code) skill that generates a `.coderabbit.yaml` for a
-repository through a guided interview.
+An agent skill that generates a `.coderabbit.yaml` for a repository through a guided interview.
 
 Most CodeRabbit configs start as a copy-pasted wall of keys that nobody can justify six months later.
 This skill takes the opposite approach: it asks what you actually want out of code review, analyzes
 the repository for evidence, and emits only the keys those answers require. Schema defaults are
 omitted, because a short config is a maintainable config.
 
+**It is plain Markdown and portable.** `SKILL.md` is a procedure written for a coding agent, not a
+plugin for one particular tool. It calls no harness-specific APIs — the only executable in the repo is
+a standalone Python validator. Any agent that can read files, run `git ls-files`, and ask you a
+question can follow it.
+
 ## Install
 
-Skills live in `~/.claude/skills/` (available in every project) or `.claude/skills/` (this project
-only).
+Clone it wherever you keep agent instructions:
+
+```bash
+git clone https://github.com/coderabbit-demo/coderabbit-config-skill.git
+```
+
+**If your harness auto-discovers skills**, put the directory where it looks. The format here is the
+`SKILL.md`-plus-frontmatter convention (a `name` and `description` in YAML frontmatter, supporting
+files alongside it), so a harness that supports skills at all can usually pick it up as-is. Claude
+Code, for example, reads `~/.claude/skills/<name>/` for personal skills and `.claude/skills/<name>/`
+for project-scoped ones:
 
 ```bash
 git clone https://github.com/coderabbit-demo/coderabbit-config-skill.git \
   ~/.claude/skills/coderabbit-config
 ```
 
-Restart Claude Code, or run `/skills` to confirm it loaded.
+Check your own tool's docs for the equivalent location — the directory name and layout don't need to
+change, only where it lives.
+
+**If your harness has no skill system**, skip the install entirely. Clone the repo and point your
+agent at it:
+
+> Read `SKILL.md` in `./coderabbit-config-skill` and follow it to build a `.coderabbit.yaml` for this
+> repository.
+
+That works in any chat-based coding agent, and it's also the fallback if auto-discovery misfires.
 
 ## Use
 
-```
-/coderabbit-config
-/coderabbit-config quickstart
-/coderabbit-config thorough
-```
+Invoke it however your harness invokes skills — a slash command, an `@`-mention, or just asking in
+plain language:
+
+> Set up a CodeRabbit config for this repo.
+
+You can name a mode up front, or let the skill ask:
 
 | Mode | Time | What it does |
 |---|---|---|
 | **Quickstart** | ~1 min | One question. Applies an opinionated baseline plus one overlay per archetype you pick. |
 | **Thorough** | ~8 min | Seven questions plus repo analysis. Produces a config tuned to the codebase in front of it. |
-
-Omit the argument and the skill asks which mode you want.
 
 ## The interview
 
@@ -49,7 +70,10 @@ Omit the argument and the skill asks which mode you want.
 
 Questions 2, 4, and 5 run repository analysis *before* asking, so you're shown concrete findings —
 "here are the 14 `AGENTS.md` files we found, here are 909 Jest snapshots" — rather than an open-ended
-prompt.
+prompt. The analysis is `git ls-files` pipelines, nothing exotic.
+
+Every question fits in four options, so agents with a structured multiple-choice prompt can use one;
+the rest fall back to a numbered list. Both paths are specified in `references/question-flow.md`.
 
 After writing the file, the skill validates it and reports a decision log: every key it emitted, and
 the answer that produced it.
@@ -79,9 +103,13 @@ references/examples/minimal...yaml        signal-only reference config
 scripts/validate_config.py                validates a config against the live schema
 ```
 
+The frontmatter in `SKILL.md` carries two optional keys (`argument-hint`, `user-invocable`) that some
+harnesses read and others ignore as unknown fields. `name` and `description` are the portable pair.
+
 ## Validator
 
-The validator runs standalone, with or without Claude Code:
+The validator is a dependency-light Python script with no agent involved. Run it in CI, in a
+pre-commit hook, or by hand:
 
 ```bash
 python3 scripts/validate_config.py .coderabbit.yaml
@@ -114,8 +142,12 @@ These caught us, and they're documented in full in `references/schema-reference.
 - **Three walkthrough extras default to `true`** (`sequence_diagrams`, `changed_files_summary`,
   `estimate_code_review_effort`). Omitting them keeps them on; you have to write `false`.
 
+Note that CodeRabbit scans a fixed set of agent-instruction files by default — `AGENTS.md`,
+`CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.clinerules/`, and
+`.github/copilot-instructions.md` among them. Those filenames appear throughout this repo because
+they are CodeRabbit's defaults, not because the skill favors any particular agent.
+
 ## Links
 
 - [CodeRabbit configuration docs](https://docs.coderabbit.ai/getting-started/configure-coderabbit)
 - [Schema](https://coderabbit.ai/integrations/schema.v2.json)
-- [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills)

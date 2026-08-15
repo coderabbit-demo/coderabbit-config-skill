@@ -177,7 +177,7 @@ where the value documents a deliberate choice the user made.
 
 ## What quickstart skips
 
-Tell the user these were not configured, and that `/coderabbit-config thorough` covers them:
+Tell the user these were not configured, and that re-running the skill in **thorough** mode covers them:
 
 - Coding-guideline documents outside the default patterns (Q2)
 - Guideline documents in other repos (Q3)
