@@ -36,7 +36,6 @@ and move on.
 ```yaml
 reviews:
   profile: quiet
-  review_details: false
   collapse_walkthrough: true
   path_instructions:
     - path: "**/*"
@@ -54,7 +53,7 @@ reviews:
 inheritance: true          # pick up org-level standards set by CodeRabbit admins
 knowledge_base:
   code_guidelines:
-    enabled: true          # filePatterns filled in by Q2
+    enabled: true          # filePatterns filled in by Q2 (this repo) and Q3 (other repos)
 reviews:
   pre_merge_checks:
     title:
@@ -112,16 +111,22 @@ git ls-files '*.md' | grep -Ei '(docs|guidelines|standards|engineering)/' | head
 
 Sort the hits into two buckets using the default-pattern list in `schema-reference.md`:
 
-- **Already auto-applied** — matches a CodeRabbit default pattern (`**/CLAUDE.md`, `**/AGENTS.md`,
-  `.github/copilot-instructions.md`, `**/.cursorrules`, `**/.cursor/rules/*`, `**/.windsurfrules`,
-  `**/.clinerules/*`, `**/.rules/*`, `**/AGENT.md`, `**/GEMINI.md`, `**/REVIEW.md`).
+- **Already auto-applied** — matches a CodeRabbit default pattern (`**/AGENTS.md`, `**/AGENT.md`,
+  `**/CLAUDE.md`, `**/GEMINI.md`, `.github/copilot-instructions.md`,
+  `.github/instructions/*.instructions.md`, `**/.cursorrules`, `**/.cursor/rules/*`,
+  `**/.windsurfrules`, `**/.clinerules/*`, `**/.rules/*`). Matching is **case-sensitive** — a
+  `claude.md` or `Agents.md` is *not* auto-applied; put it in the second bucket.
 - **Not currently applied** — everything else you found.
+
+For the first bucket, note where each file sits: a default-pattern file applies to **its own directory
+and everything below it**, so `src/frontend/CLAUDE.md` already only governs `src/frontend/**`. Nothing
+to configure for those.
 
 **Ask** (show both bucket lists first, with file paths):
 
 > We scanned the repo for coding-guideline documents.
 >
-> **Already applied globally by default:** `<list>`
+> **Already applied by default** (each to its own directory and below): `<list>`
 > **Found but not currently applied:** `<list>`
 >
 > **How should we handle the unapplied documents?**
@@ -130,15 +135,20 @@ Sort the hits into two buckets using the default-pattern list in `schema-referen
 > - **Scope them to specific paths** — e.g. the backend guide only applies to `services/**`.
 > - **Don't apply them** — they're not review criteria.
 
-**Mapping.** Two behaviors here are counter-intuitive and the schema does not express either. Verify
-both against the reviewer source before relying on them (see the note at the end of this section).
+If the user picks *scope*, ask a follow-up per document (or propose a mapping and let them correct it):
+which files should this document govern? Infer a sensible default from the document's name and
+contents — `docs/frontend.md` → `src/frontend/**/*.{js,jsx,ts,tsx}` — and confirm it.
 
-1. **`filePatterns` extends the defaults; it does not replace them.** The reviewer appends
-   `DEFAULT_GUIDELINE_FILE_PATTERNS` to whatever you write. Restating defaults produces duplicates,
-   not safety — list only the *new* documents.
-2. **Object-form `{files, applyTo}` entries are discarded.** The reviewer narrows the array with
-   `.filter(p => typeof p === "string")` before use, so a scoped entry is not "scoped" — it is
-   dropped, and the document is never indexed at all.
+**Mapping.** `filePatterns` entries come in two forms, and both work:
+
+- **Plain string** — a glob for the guideline documents. Applies to the directory the document lives in
+  and below; a document at the repo root (or in `docs/`, which is outside the source tree) therefore
+  needs an `applyTo` if it should only govern part of the code.
+- **Object `{files, applyTo}`** — `files` is the guideline document(s), `applyTo` is the glob of source
+  files they govern. Use this for any guideline stored away from the code it describes.
+
+`filePatterns` **extends** the defaults; it never replaces them. List only the *new* documents —
+restating `**/CLAUDE.md` and friends adds nothing.
 
 Apply globally — plain strings, new documents only:
 ```yaml
@@ -146,67 +156,89 @@ knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
+      - "**/CODING_STANDARDS.md"
       - "docs/engineering-standards.md"
 ```
 
-Scope to paths — put the *documents* in `filePatterns` as plain strings so they get indexed, and put
-the *scoping* in `reviews.path_instructions`, which is honored per-path:
+Scope to paths — object form with `applyTo`:
 ```yaml
-reviews:
-  path_instructions:
-    - path: "{services,packages/api}/**"
-      instructions: >
-        - Apply docs/backend-standards.md when reviewing these files.
-    - path: "**/*.{tsx,css}"
-      instructions: >
-        - Apply docs/frontend-standards.md when reviewing these files.
 knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
-      - "docs/backend-standards.md"
-      - "docs/frontend-standards.md"
+      - files: "docs/guidelines/backend.md"
+        applyTo: "{services,packages/api}/**"
+      - files: "docs/guidelines/frontend.md"
+        applyTo: "src/frontend/**/*.{js,jsx,ts,tsx}"
 ```
 
-Be honest with the user about what this buys: `filePatterns` makes a document available repo-wide, and
-the `path_instructions` entry directs the reviewer's attention rather than hard-scoping it. It is
-guidance, not enforcement — but it is the only mechanism that actually takes effect.
+Mixing both forms in one list is fine. Do **not** also restate the scoping in
+`reviews.path_instructions` — `applyTo` is the mechanism; a duplicate path instruction only adds noise.
 
 Don't apply: omit `filePatterns` entirely (defaults stay active). If the user wants guidelines off
-completely, set `knowledge_base.code_guidelines.enabled: false`.
+completely, set `knowledge_base.code_guidelines.enabled: false`. Individual auto-detected files can
+also be disabled in the CodeRabbit UI without deleting them — mention this if the user wants to drop
+one default-pattern file but keep the rest.
 
-**Verify before you trust this.** Both behaviors above were read out of a CodeRabbit reviewer checkout,
-not the published schema, so they can drift. When the repo you are configuring *is* the reviewer
-(`pr-reviewer-saas/` present), confirm with:
-
-```bash
-git grep -n 'DEFAULT_GUIDELINE_FILE_PATTERNS\|typeof p === "string"' -- 'pr-reviewer-saas/**' ':!*.test.ts'
-```
-
-Otherwise state the caveat to the user rather than asserting the behavior flatly.
+**Constraints** (see `schema-reference.md` for the full list): only text/documentation files are
+eligible (`.md`, `.mdc`, `.yaml`, `.txt`, …) — never point `files` at source code; each entry ≤ 512
+characters; repo-relative paths only (no leading `/`, no `..`, no backslashes); at most 50 files are
+expanded from globs per review, so prefer specific paths over broad globs like `**/*.md`.
 
 ---
 
 ## Q3 — Guideline documents in other repositories
 
+Guidelines in another repo are pulled in through **`code_guidelines.filePatterns`** using
+`repo:path` (same organization) or `owner/repo:path` syntax — *not* through `linked_repositories`.
+`linked_repositories` (Q5) gives the reviewer cross-repo code context; it does not make another repo's
+documents into review criteria.
+
 **Ask:**
 
 > **Are there coding-standards documents in *other* repositories that should inform reviews here?**
-> For example a central `engineering-handbook` or a shared `platform-standards` repo.
-> List them as `owner/repo` (or leave blank for none).
+> For example a central `engineering-standards` or `platform-standards` repo.
+> List the repo and, if you know them, the document paths (or leave blank for none).
 
-**Mapping** — merge with Q5 into one `linked_repositories` list:
-```yaml
-knowledge_base:
-  linked_repositories:
-    - repository: myorg/engineering-handbook
-      instructions: >
-        Source of truth for org-wide coding standards. Apply the language-specific
-        style rules and the API design guidelines when reviewing this repo.
+**Analyze, if you can.** When the user names a repo but not paths, and `gh` is authenticated, list
+candidate documents rather than guessing:
+
+```bash
+gh api "repos/<owner>/<repo>/git/trees/HEAD?recursive=1" --jq '.tree[] | select(.type=="blob") | .path' \
+  | grep -Ei '\.(md|mdc|txt|ya?ml)$' | head -60
 ```
 
-Note for the user: linked repositories must be accessible to the CodeRabbit app installation. If a repo
-isn't installed, the link is silently inert.
+Show what you found and ask which documents apply, and to which files in *this* repo — e.g.
+`python/**/*.md` → `**/*.py`, `frontend/react.md` → `src/**/*.{tsx,jsx}`. A cross-repo document with
+no `applyTo` governs this whole repo; use that only for genuinely org-wide standards. If you can't list
+the repo, write the paths the user gives you and tell them to double-check them.
+
+**Mapping** — add to the same `filePatterns` list as Q2:
+```yaml
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "engineering-standards:general/code-review.md"        # org-wide, whole repo
+      - files: "engineering-standards:python/**/*.md"
+        applyTo: "**/*.py"
+      - files: "acme/platform-standards:frontend/react.md"     # owner/repo form
+        applyTo: "src/frontend/**/*.{js,jsx,ts,tsx}"
+```
+
+Use the short `repo:path` form when the repo shares this repo's owner; use `owner/repo:path`
+otherwise or when in doubt.
+
+Tell the user:
+- The source repo must be in the same GitHub organization (GitLab top-level group / Bitbucket Cloud
+  workspace) and accessible to the CodeRabbit installation; otherwise the entry is inert.
+- Max 50 cross-repository entries per repo, and the 50-files-per-review glob cap applies here too.
+- To try a guideline on a single PR before committing it to config, they can put a
+  `@coderabbitai configuration override` block in the PR description with the same
+  `knowledge_base.code_guidelines.filePatterns` entry (PR author must be a repo collaborator).
+
+If the user *also* wants the reviewer to see that repo's code (not just its documents), add it in Q5
+as well.
 
 ---
 
@@ -270,7 +302,7 @@ in CI workflows, and `owner/repo` mentions in the README.
 > `<candidates found>`
 > List as `owner/repo`, or say none.
 
-**Mapping** — same list as Q3, different `instructions`:
+**Mapping:**
 ```yaml
 knowledge_base:
   automatic_repository_linking: true    # let CodeRabbit infer links too

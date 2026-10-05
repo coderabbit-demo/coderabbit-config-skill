@@ -55,15 +55,17 @@ wording, the options, the repo analysis to run first, and the YAML each answer m
 | # | Question | Primary keys |
 |---|---|---|
 | Q1 | What are you looking for in a review tool? | `reviews.profile`, `reviews.path_instructions` |
-| Q2 | Existing coding-guideline docs in this repo | `knowledge_base.code_guidelines` |
-| Q3 | Guideline docs living in other repos | `knowledge_base.linked_repositories` |
+| Q2 | Existing coding-guideline docs in this repo | `knowledge_base.code_guidelines.filePatterns` (`applyTo` for scoping) |
+| Q3 | Guideline docs living in other repos | `knowledge_base.code_guidelines.filePatterns` (`repo:path`) |
 | Q4 | File types that add noise to reviews | `reviews.path_filters` |
 | Q5 | Other repos relevant to changes here | `knowledge_base.linked_repositories` |
 | Q6 | What appears on the PR (summary / walkthrough / fun) | `reviews.high_level_summary*`, `reviews.collapse_walkthrough`, `chat.art` |
 | Q7 | Merge gates | `reviews.pre_merge_checks` |
 
-Q3 and Q5 both write to `knowledge_base.linked_repositories` — merge them into one list with
-per-entry `instructions` describing why each repo matters. Cap at 20 entries (schema limit).
+Q2 and Q3 both write to `knowledge_base.code_guidelines.filePatterns` — merge them into one list.
+Use the object form `{files, applyTo}` whenever a document should govern only part of the repo, and
+`repo:path` / `owner/repo:path` for documents that live in another repository. Q3 does **not** write
+`linked_repositories`; that key (Q5) is for cross-repo code context, capped at 20 entries.
 
 **Do not ask about issue trackers or external data sources.** Jira, Linear, Confluence, Notion, and
 MCP servers are dashboard concerns, not config concerns — connecting them is an authentication step
@@ -83,7 +85,11 @@ Carry a running decision log as you go: `answer → key → value`. You will nee
    treat every WARNING as a misplaced key until proven otherwise.
    If the script can't run (no PyYAML), self-check every key you emitted against
    `references/schema-reference.md` and say that you did the check manually.
-4. Present the decision log as a table, then offer: *"Want to change any of these?"*
+4. Make sure `reviews.review_details: true` is in the file — every config this skill writes enables it
+   (the schema default is `false`). If you are tuning an existing `.coderabbit.yaml` and it already
+   has `review_details: true`, leave it; if the key is missing or `false`, set it to `true` and list
+   that change in the decision log. Only write `false` if the user explicitly asks to turn it off.
+5. Present the decision log as a table, then offer: *"Want to change any of these?"*
 
 ## Step 4 — Dashboard hand-off
 

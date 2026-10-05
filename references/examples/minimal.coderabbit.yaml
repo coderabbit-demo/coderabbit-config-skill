@@ -11,6 +11,7 @@ inheritance: true
 
 reviews:
   profile: chill
+  review_details: true
   request_changes_workflow: false
   disable_cache: true
 

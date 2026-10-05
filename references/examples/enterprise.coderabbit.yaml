@@ -21,7 +21,7 @@ reviews:
   changed_files_summary: true
   sequence_diagrams: true
   estimate_code_review_effort: false
-  review_details: false
+  review_details: true
   in_progress_fortune: false
   poem: false
   request_changes_workflow: false
@@ -149,4 +149,9 @@ knowledge_base:
   automatic_repository_linking: true
   code_guidelines:
     enabled: true
-    filePatterns: ["**/*.md"]
+    filePatterns:
+      - "docs/engineering-standards.md"
+      - files: "docs/guidelines/backend.md"
+        applyTo: "services/**"
+      - files: "engineering-standards:python/**/*.md"
+        applyTo: "**/*.py"

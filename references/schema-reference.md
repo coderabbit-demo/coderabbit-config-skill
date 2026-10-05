@@ -30,14 +30,12 @@ Always start the generated file with:
 
 4. **`code_guidelines` lives under `knowledge_base`**, not at root.
 
-5. **`filePatterns` *extends* the defaults — it does not replace them**, and **object-form
-   `{files, applyTo}` entries are silently dropped.** The schema accepts the object form
-   (`files` and `applyTo` are both `z.string()`, documented as comma-separated globs), but the
-   reviewer filters the array with `.filter(p => typeof p === "string")` and then concatenates
-   `DEFAULT_GUIDELINE_FILE_PATTERNS`. Net effect: restated defaults are duplicates, and any scoped
-   entry never gets indexed. Write plain strings and express scoping through
-   `reviews.path_instructions`. See Q2 in `question-flow.md` for the pattern and the verification
-   command.
+5. **`filePatterns` *extends* the defaults — it does not replace them.** Restating a default pattern
+   adds nothing; list only new documents. Entries are either a plain string (glob for guideline
+   documents, scoped to the document's own directory and below) or an object `{files, applyTo}`
+   (`files` = the documents, `applyTo` = the source files they govern). Prefix a path with
+   `repo:` or `owner/repo:` to pull documents from another repository — that is how cross-repo
+   guidelines work, **not** `linked_repositories`. See Q2/Q3 in `question-flow.md`.
 
 6. **`path_filters` drives sparse-checkout.** Excluded paths aren't cloned, so they can't be used as
    review context either.
@@ -78,7 +76,7 @@ high_level_summary_in_walkthrough[bool]    false
 auto_title_placeholder           [string]  "@coderabbitai"
 auto_title_instructions          [string]  ""
 review_status                    [bool]    true
-review_details                   [bool]    false
+review_details                   [bool]    false  — this skill always writes true
 review_progress                  [bool]    true
 commit_status                    [bool]    true   — false stops CodeRabbit posting a commit status
 fail_commit_status               [bool]    false
@@ -147,9 +145,10 @@ chat.integrations.linear.usage   [string]  "auto"
 opt_out                          [bool]    false  — true disables the whole knowledge base
 web_search.enabled               [bool]    true
 code_guidelines.enabled          [bool]    true
-code_guidelines.filePatterns     [array]   []     — string globs; ADDED to the defaults, not
-                                                    substituted. {files, applyTo} objects validate
-                                                    but are dropped at runtime — see trap 5.
+code_guidelines.filePatterns     [array]   []     — ADDED to the defaults, not substituted.
+                                                    items: "glob" | {files, applyTo};
+                                                    "repo:path" / "owner/repo:path" for other
+                                                    repos — see trap 5.
 learnings.scope                  [string]  "auto" — enum: local | global | auto
 learnings.approval_delay         [int]     0
 issues.scope                     [string]  "auto"
@@ -187,30 +186,52 @@ labeling.auto_apply_labels       [bool]    false
 ## Default `code_guidelines.filePatterns`
 
 CodeRabbit always scans these. Anything you put in `filePatterns` is added to this list, never
-substituted for it — so do not restate these entries.
+substituted for it — so do not restate these entries. Matching is **case-sensitive** (`claude.md` is
+not matched by `**/CLAUDE.md`). Each matched file applies to its own directory and everything below it.
 
 ```
-**/.cursorrules
-.github/copilot-instructions.md
+**/AGENTS.md
+**/AGENT.md
 **/CLAUDE.md
 **/GEMINI.md
+.github/copilot-instructions.md
+.github/instructions/*.instructions.md
+**/.cursorrules
 **/.cursor/rules/*
 **/.windsurfrules
 **/.clinerules/*
 **/.rules/*
-**/AGENT.md
-**/AGENTS.md
-**/REVIEW.md
 ```
 
-Scoped form — **accepted by the schema, ignored by the reviewer.** Both fields are required and each
-takes comma-separated globs, so this validates cleanly and then does nothing (see trap 5):
+### Entry forms
+
 ```yaml
-# DO NOT EMIT — the reviewer drops every non-string entry.
-- files: "docs/backend-standards.md"
-  applyTo: "services/**,packages/api/**"
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      # Plain string — document(s) apply to their own directory and below
+      - "**/CODING_STANDARDS.md"
+      # Scoped — guideline stored outside the code it governs
+      - files: "docs/guidelines/frontend.md"
+        applyTo: "src/frontend/**/*.{js,jsx,ts,tsx}"
+      # Another repo, same org — short form
+      - "engineering-standards:frontend/react.md"
+      # Another repo, scoped — owner/repo form also accepted
+      - files: "acme/engineering-standards:python/**/*.md"
+        applyTo: "**/*.py"
 ```
-Use a plain string in `filePatterns` plus a `reviews.path_instructions` entry instead.
+
+### Limits and validation
+
+- Max **50 cross-repository entries** per repository.
+- Max **50 files expanded from globs** per review — prefer specific paths over `**/*.md`.
+- Each entry ≤ **512 characters**.
+- Only text/documentation files (`.md`, `.mdc`, `.yaml`, `.txt`, …); source files are ignored.
+- Rejected: absolute paths, `..` traversal, backslashes, malformed repository names.
+- Cross-repo sources must share the GitHub organization (GitLab top-level group, Bitbucket Cloud
+  workspace) and be accessible to the CodeRabbit installation.
+- Per-PR trial: a `@coderabbitai configuration override` YAML block in the PR description can add
+  `filePatterns` entries for that PR only (author must be a collaborator).
 
 ---
 

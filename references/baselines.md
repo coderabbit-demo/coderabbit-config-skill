@@ -17,6 +17,8 @@ config — it just moves the tuning problem to the user's first ten PRs.
 inheritance: true
 
 reviews:
+  # Always on: shows the review-details block (config used, files reviewed/skipped) on every review.
+  review_details: true
   auto_review:
     auto_incremental_review: true
 
@@ -32,7 +34,6 @@ knowledge_base:
 ```yaml
 reviews:
   profile: quiet
-  review_details: false
   collapse_walkthrough: true
   changed_files_summary: false
   sequence_diagrams: false
@@ -166,7 +167,8 @@ Apply in this order when two overlays set the same key:
 3. **`pre_merge_checks` modes** — the stricter mode wins (`error` > `warning` > `off`), except that
    A alone means everything is `off`.
 4. **Display keys** (`collapse_walkthrough`, `sequence_diagrams`, `changed_files_summary`, `poem`,
-   `in_progress_fortune`, `chat.art`) — `false` wins over `true`.
+   `in_progress_fortune`, `chat.art`) — `false` wins over `true`. **`review_details` is not a display
+   key for this rule** — it is always `true` (from the base), whatever overlays are selected.
 5. **`tone_instructions`** — a single string, so pick one. D's concise instruction wins over C's if
    both are selected.
 

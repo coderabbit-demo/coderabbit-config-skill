@@ -41,8 +41,8 @@ has no skill system, clone anywhere and ask your agent in plain language:
 | # | Question | Primary keys |
 |---|---|---|
 | Q1 | What are you looking for in a review tool? | `reviews.profile`, `reviews.path_instructions` |
-| Q2 | Coding-guideline docs in this repo | `knowledge_base.code_guidelines` |
-| Q3 | Guideline docs in other repos | `knowledge_base.linked_repositories` |
+| Q2 | Coding-guideline docs in this repo | `knowledge_base.code_guidelines.filePatterns` (`applyTo` for scoping) |
+| Q3 | Guideline docs in other repos | `knowledge_base.code_guidelines.filePatterns` (`repo:path`) |
 | Q4 | File types that add noise to reviews | `reviews.path_filters` |
 | Q5 | Other repos relevant to changes here | `knowledge_base.linked_repositories` |
 | Q6 | What appears on the PR | `reviews.high_level_summary*`, `reviews.collapse_walkthrough`, `chat.art` |
